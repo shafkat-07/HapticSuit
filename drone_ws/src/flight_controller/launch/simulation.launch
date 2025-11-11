@@ -1,0 +1,15 @@
+<launch>
+
+  <arg name="world_file" default="$(find flight_controller)/worlds/simple_world.world" />
+
+  <include file="$(find gazebo_ros)/launch/empty_world.launch">
+    <arg name="world_name" value="$(arg world_file)"/>
+    <arg name="gui" value="true"/>
+    <arg name="paused" value="false"/>
+    <arg name="use_sim_time" value="true"/>
+  </include>
+
+  <!-- Spawn the F450 drone -->
+  <include file="$(find flight_controller)/launch/spawn_f450.launch" />
+
+</launch>

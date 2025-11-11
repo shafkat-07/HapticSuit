@@ -1,0 +1,224 @@
+<?xml version="1.0" ?>
+<sdf version="1.6">
+  <model name="f450">
+    <pose>0 0 0.1 0 0 0</pose>
+
+    <!-- Main body/frame -->
+    <link name="base_link">
+      <inertial>
+        <pose>0 0 0 0 0 0</pose>
+        <mass>1.5</mass>
+        <inertia>
+          <ixx>0.029125</ixx>
+          <ixy>0</ixy>
+          <ixz>0</ixz>
+          <iyy>0.029125</iyy>
+          <iyz>0</iyz>
+          <izz>0.055225</izz>
+        </inertia>
+      </inertial>
+
+      <collision name="base_collision">
+        <pose>0 0 0 0 0 0</pose>
+        <geometry>
+          <box>
+            <size>0.47 0.47 0.11</size>
+          </box>
+        </geometry>
+      </collision>
+
+      <visual name="base_visual">
+        <pose>0 0 0 0 0 0</pose>
+        <geometry>
+          <box>
+            <size>0.47 0.47 0.11</size>
+          </box>
+        </geometry>
+        <material>
+          <ambient>0.2 0.2 0.2 1</ambient>
+          <diffuse>0.3 0.3 0.3 1</diffuse>
+          <specular>0.5 0.5 0.5 1</specular>
+        </material>
+      </visual>
+
+      <!-- Arms -->
+      <visual name="arm_front_left">
+        <pose>0.16 0.16 0 0 0 0.785398</pose>
+        <geometry>
+          <box>
+            <size>0.26 0.04 0.02</size>
+          </box>
+        </geometry>
+        <material>
+          <ambient>1 0 0 1</ambient>
+          <diffuse>1 0 0 1</diffuse>
+        </material>
+      </visual>
+
+      <visual name="arm_front_right">
+        <pose>0.16 -0.16 0 0 0 -0.785398</pose>
+        <geometry>
+          <box>
+            <size>0.26 0.04 0.02</size>
+          </box>
+        </geometry>
+        <material>
+          <ambient>0 0 0 1</ambient>
+          <diffuse>0.1 0.1 0.1 1</diffuse>
+        </material>
+      </visual>
+
+      <visual name="arm_back_left">
+        <pose>-0.16 0.16 0 0 0 -0.785398</pose>
+        <geometry>
+          <box>
+            <size>0.26 0.04 0.02</size>
+          </box>
+        </geometry>
+        <material>
+          <ambient>0 0 0 1</ambient>
+          <diffuse>0.1 0.1 0.1 1</diffuse>
+        </material>
+      </visual>
+
+      <visual name="arm_back_right">
+        <pose>-0.16 -0.16 0 0 0 0.785398</pose>
+        <geometry>
+          <box>
+            <size>0.26 0.04 0.02</size>
+          </box>
+        </geometry>
+        <material>
+          <ambient>0 0 0 1</ambient>
+          <diffuse>0.1 0.1 0.1 1</diffuse>
+        </material>
+      </visual>
+
+      <!-- Motors -->
+      <visual name="motor_front_left">
+        <pose>0.225 0.225 0.025 0 0 0</pose>
+        <geometry>
+          <cylinder>
+            <radius>0.025</radius>
+            <length>0.02</length>
+          </cylinder>
+        </geometry>
+        <material>
+          <ambient>0.5 0.5 0.5 1</ambient>
+          <diffuse>0.6 0.6 0.6 1</diffuse>
+        </material>
+      </visual>
+
+      <visual name="motor_front_right">
+        <pose>0.225 -0.225 0.025 0 0 0</pose>
+        <geometry>
+          <cylinder>
+            <radius>0.025</radius>
+            <length>0.02</length>
+          </cylinder>
+        </geometry>
+        <material>
+          <ambient>0.5 0.5 0.5 1</ambient>
+          <diffuse>0.6 0.6 0.6 1</diffuse>
+        </material>
+      </visual>
+
+      <visual name="motor_back_left">
+        <pose>-0.225 0.225 0.025 0 0 0</pose>
+        <geometry>
+          <cylinder>
+            <radius>0.025</radius>
+            <length>0.02</length>
+          </cylinder>
+        </geometry>
+        <material>
+          <ambient>0.5 0.5 0.5 1</ambient>
+          <diffuse>0.6 0.6 0.6 1</diffuse>
+        </material>
+      </visual>
+
+      <visual name="motor_back_right">
+        <pose>-0.225 -0.225 0.025 0 0 0</pose>
+        <geometry>
+          <cylinder>
+            <radius>0.025</radius>
+            <length>0.02</length>
+          </cylinder>
+        </geometry>
+        <material>
+          <ambient>0.5 0.5 0.5 1</ambient>
+          <diffuse>0.6 0.6 0.6 1</diffuse>
+        </material>
+      </visual>
+
+      <!-- Propellers -->
+      <visual name="prop_front_left">
+        <pose>0.225 0.225 0.04 0 0 0</pose>
+        <geometry>
+          <cylinder>
+            <radius>0.12</radius>
+            <length>0.005</length>
+          </cylinder>
+        </geometry>
+        <material>
+          <ambient>0.2 0.2 0.2 0.8</ambient>
+          <diffuse>0.3 0.3 0.3 0.8</diffuse>
+        </material>
+      </visual>
+
+      <visual name="prop_front_right">
+        <pose>0.225 -0.225 0.04 0 0 0</pose>
+        <geometry>
+          <cylinder>
+            <radius>0.12</radius>
+            <length>0.005</length>
+          </cylinder>
+        </geometry>
+        <material>
+          <ambient>0.2 0.2 0.2 0.8</ambient>
+          <diffuse>0.3 0.3 0.3 0.8</diffuse>
+        </material>
+      </visual>
+
+      <visual name="prop_back_left">
+        <pose>-0.225 0.225 0.04 0 0 0</pose>
+        <geometry>
+          <cylinder>
+            <radius>0.12</radius>
+            <length>0.005</length>
+          </cylinder>
+        </geometry>
+        <material>
+          <ambient>0.2 0.2 0.2 0.8</ambient>
+          <diffuse>0.3 0.3 0.3 0.8</diffuse>
+        </material>
+      </visual>
+
+      <visual name="prop_back_right">
+        <pose>-0.225 -0.225 0.04 0 0 0</pose>
+        <geometry>
+          <cylinder>
+            <radius>0.12</radius>
+            <length>0.005</length>
+          </cylinder>
+        </geometry>
+        <material>
+          <ambient>0.2 0.2 0.2 0.8</ambient>
+          <diffuse>0.3 0.3 0.3 0.8</diffuse>
+        </material>
+      </visual>
+
+    </link>
+
+    <!-- Simple physics plugin for hovering -->
+    <plugin name="quadcopter_simple_controller" filename="libgazebo_ros_planar_move.so">
+      <commandTopic>cmd_vel</commandTopic>
+      <odometryTopic>odom</odometryTopic>
+      <odometryFrame>odom</odometryFrame>
+      <odometryRate>20.0</odometryRate>
+      <robotBaseFrame>base_link</robotBaseFrame>
+    </plugin>
+
+  </model>
+</sdf>
+
