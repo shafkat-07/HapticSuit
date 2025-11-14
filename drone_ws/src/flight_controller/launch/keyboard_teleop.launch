@@ -1,0 +1,7 @@
+<?xml version="1.0"?>
+<launch>
+  <!-- Standalone keyboard teleop - run this in a separate terminal -->
+  <node name="f450_keyboard_teleop" pkg="flight_controller" 
+        type="f450_keyboard_teleop.py" output="screen"/>
+</launch>
+

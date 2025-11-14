@@ -1,0 +1,17 @@
+<?xml version="1.0"?>
+<launch>
+    <!-- MAVROS node for SITL -->
+    <node pkg="mavros" type="mavros_node" name="mavros" required="true" output="screen">
+        <!-- Connection settings for ArduPilot SITL -->
+        <param name="fcu_url" value="udp://:14540@127.0.0.1:14550" />
+        <param name="gcs_url" value="" />
+        <param name="tgt_system" value="1" />
+        <param name="tgt_component" value="1" />
+
+        <!-- Load ArduPilot specific plugins -->
+        <rosparam command="load" file="$(find mavros)/launch/apm_pluginlists.yaml" />
+
+        <!-- Load default config (apm_config.yaml is not available, px4_config is a decent fallback) -->
+        <rosparam command="load" file="$(find mavros)/launch/px4_config.yaml" />
+    </node>
+</launch>
