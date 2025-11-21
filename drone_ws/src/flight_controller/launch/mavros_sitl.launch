@@ -3,7 +3,7 @@
     <!-- MAVROS node for SITL -->
     <node pkg="mavros" type="mavros_node" name="mavros" required="true" output="screen">
         <!-- Connection settings for ArduPilot SITL -->
-        <param name="fcu_url" value="udp://:14540@127.0.0.1:14550" />
+        <param name="fcu_url" value="tcp://127.0.0.1:5760" />
         <param name="gcs_url" value="" />
         <param name="tgt_system" value="1" />
         <param name="tgt_component" value="1" />

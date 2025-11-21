@@ -64,9 +64,8 @@ class MavrosKeyboardTeleop:
         self.linear_speed = 1.0
         self.angular_speed = 0.5
         self.vertical_speed = 0.5
-
-        # Terminal settings
-        self.settings = termios.tcgetattr(sys.stdin)
+        # Terminal settings (simplified - no raw mode needed)
+        self.old_settings = termios.tcgetattr(sys.stdin)
         
         # Rate
         self.rate = rospy.Rate(20) # Must be faster than 2Hz for offboard mode
@@ -79,14 +78,13 @@ class MavrosKeyboardTeleop:
 
     def get_key(self, timeout=0.1):
         """Get a single keypress from the terminal"""
-        tty.setraw(sys.stdin.fileno())
+        # Use select to check if input is available
         rlist, _, _ = select.select([sys.stdin], [], [], timeout)
         if rlist:
             key = sys.stdin.read(1)
-        else:
-            key = ''
-        termios.tcsetattr(sys.stdin, termios.TCSADRAIN, self.settings)
-        return key
+            rospy.loginfo("Key detected: '{}'".format(repr(key)))
+            return key
+        return ''
 
     def takeoff(self, altitude):
         if self.current_pose is None:
@@ -131,8 +129,12 @@ class MavrosKeyboardTeleop:
 
         rospy.loginfo("FCU connected.")
 
+        # Set terminal to unbuffered mode for immediate key capture
+        tty.setcbreak(sys.stdin.fileno())
+
         try:
             print(INSTRUCTIONS)
+            rospy.loginfo("Keyboard control active - press keys now!")
             while not rospy.is_shutdown():
                 key = self.get_key()
                 
@@ -179,7 +181,7 @@ class MavrosKeyboardTeleop:
             
         finally:
             # Restore terminal settings
-            termios.tcsetattr(sys.stdin, termios.TCSADRAIN, self.settings)
+            termios.tcsetattr(sys.stdin, termios.TCSADRAIN, self.old_settings)
 
 
 if __name__ == '__main__':

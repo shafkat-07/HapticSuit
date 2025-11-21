@@ -1,0 +1,9 @@
+<?xml version="1.0"?>
+<launch>
+  <!-- MAVROS node -->
+  <include file="$(find flight_controller)/launch/mavros_sitl.launch" />
+
+  <!-- Keyboard teleop node -->
+  <node name="f450_keyboard_teleop" pkg="flight_controller" 
+        type="f450_keyboard_teleop.py" output="screen"/>
+</launch>

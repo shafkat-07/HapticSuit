@@ -1,0 +1,6 @@
+<?xml version="1.0"?>
+<launch>
+  <!-- MAVROS node only -->
+  <include file="$(find flight_controller)/launch/mavros_sitl.launch" />
+</launch>
+

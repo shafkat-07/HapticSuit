@@ -1,0 +1,47 @@
+<?xml version="1.0" ?>
+<sdf version="1.5">
+  <model name="gps">
+    <link name="link">
+      <inertial>
+        <mass>0.015</mass>
+        <inertia>
+          <ixx>0.00001</ixx>
+          <ixy>0</ixy>
+          <ixz>0</ixz>
+          <iyy>0.00001</iyy>
+          <iyz>0</iyz>
+          <izz>0.00001</izz>
+        </inertia>
+      </inertial>
+      <visual name="visual">
+        <geometry>
+          <box>
+            <size>0.02 0.02 0.01</size>
+          </box>
+        </geometry>
+        <material>
+          <script>
+            <name>Gazebo/Black</name>
+            <uri>file://media/materials/scripts/gazebo.material</uri>
+          </script>
+        </material>
+      </visual>
+      <collision name="collision">
+        <geometry>
+          <box>
+            <size>0.02 0.02 0.01</size>
+          </box>
+        </geometry>
+      </collision>
+      <sensor name="gps" type="gps">
+        <pose>0 0 0 0 0 0</pose>
+        <always_on>1</always_on>
+        <update_rate>10.0</update_rate>
+        <plugin name="gps_plugin" filename="libgazebo_gps_plugin.so">
+          <robotNamespace/>
+          <gpsNoise>true</gpsNoise>
+        </plugin>
+      </sensor>
+    </link>
+  </model>
+</sdf>
