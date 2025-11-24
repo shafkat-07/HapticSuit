@@ -13,8 +13,8 @@
 // Define the IMU start address (note they go in decreasing order from this point)
 #define IMU_START_ADDRESS 0x4B
 // Define the wifi SSID and password (set to "" for no password)
-#define WIFI_SSID "ViconNetwork"
-#define WIFI_PASSWORD "LessLabUVA1234"
+#define WIFI_SSID "NU-IoT"
+#define WIFI_PASSWORD "nkzvswmm"
 // Define if you want to enable wifi (makes debugging easier)
 #define ENABLE_WIFI true
 // Define the UDP communication port
