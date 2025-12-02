@@ -16,8 +16,9 @@ sock.settimeout(2.0) # 2 second timeout for receiving reply
 while True:
     try:
         # Message format: "roll_1,roll_2,throttle_1,throttle_2"
-        # We send a dummy message just to trigger a response from the Arduino
-        message = "0,0,0,0" 
+        # Adjusted for 1 IMU/Motor setup: "roll_1, unused, throttle_1, unused"
+        # Sending 0 roll target and 50 throttle for the first motor
+        message = "0,0,50,0" 
         
         print(f"Sending ping: {message}")
         sock.sendto(message.encode(), (UDP_IP, UDP_PORT))
