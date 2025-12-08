@@ -1,0 +1,30 @@
+<launch>
+    <!-- 
+        This launch file simplifies the entire simulation startup process into a single command.
+        It starts Gazebo, the ArduPilot SITL, MAVROS, and the Haptic Bridge node.
+    -->
+
+    <!-- Get home directory -->
+    <env name="HOME" value="$(env HOME)"/>
+
+    <!-- 1. Start Gazebo with the ArduCopter runway world -->
+    <include file="$(find gazebo_ros)/launch/empty_world.launch">
+        <arg name="world_name" value="$(env HOME)/ardupilot_gazebo/worlds/iris_arducopter_runway.world"/>
+        <arg name="verbose" value="true"/>
+    </include>
+
+    <!-- 2. Run the ArduPilot SITL using the robust Python launcher -->
+    <!-- This node executes sim_vehicle.py in a new terminal -->
+    <node name="sitl" pkg="haptic_interface" type="sitl_launcher.py" output="screen"/>
+
+    <!-- 3. Launch the MAVROS bridge -->
+    <!-- It connects the ArduPilot SITL to the ROS network -->
+    <include file="$(find mavros)/launch/apm.launch">
+        <arg name="fcu_url" value="udp://:14550@"/>
+    </include>
+
+    <!-- 4. Start the Haptic Bridge Node -->
+    <!-- This is your custom node that translates simulation forces to haptic feedback -->
+    <node name="haptic_bridge" pkg="haptic_interface" type="haptic_bridge.py" output="screen"/>
+
+</launch>

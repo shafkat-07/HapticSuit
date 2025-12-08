@@ -54,44 +54,38 @@ Add the model paths to your environment so Gazebo can find the drone.
 echo 'export GAZEBO\_MODEL\_PATH=\~/ardupilot\_gazebo/models:${GAZEBO\_MODEL\_PATH}' \>\> \~/.bashrc  
 source \~/.bashrc
 ```
+### **Step 4: Build the ROS Workspace**
+
+Before running the simulation, you need to build your ROS workspace to recognize the new `haptic_interface` package and its launch file.
+```
+cd drone_ws
+catkin_make
+source devel/setup.bash
+```
+
 ## **3\. Phase 2: Running the Simulation**
 
 *Goal: Launch a drone that is controlled by real flight logic.*
 
-### **Terminal 1: The Simulation**
+Thanks to the new ROS launch file, the entire simulation can be started with a single command. This will automatically open Gazebo, the ArduPilot flight controller (in a new terminal window), MAVROS, and the haptic bridge.
 
-This starts Gazebo and the Flight Controller. We use the standard "Iris" drone (Quad-X, ~1.5kg) which is dynamically similar to your F450.
-
-**Note:** These commands need to be run in two separate terminals in the same directory.
-
-In the **first** terminal, launch Gazebo:
 ```
-cd ~/ardupilot/ArduCopter
-gazebo --verbose worlds/iris_arducopter_runway.world
+roslaunch haptic_interface start_simulation.launch
 ```
 
-In the **second** terminal, launch the flight controller:
-```
-cd ~/ardupilot/ArduCopter
-sim_vehicle.py -v ArduCopter -f gazebo-iris --console
-```
-* **Success Check:** You should see the drone in Gazebo and a map/console window pop up.
-
-### **Terminal 2: The ROS Bridge**
-
-This connects your simulation to the ROS network.
-
-roslaunch mavros apm.launch fcu_url:=udp://:14550@
-
-* **Success Check:** Run rostopic echo /mavros/state and look for connected: True.
+* **Success Check:** 
+    * You should see the drone in a Gazebo world.
+    * A new terminal window should pop up showing the MAVProxy console.
+    * Run `rostopic echo /mavros/state` in a new terminal and look for `connected: True`.
 
 ## **4\. Phase 3: The Haptic Bridge Code**
 
 *Goal: Extract the "Force" data and send it to your suit.*
 
-Create a new file named haptic\_bridge.py in your workspace. This script replaces all your previous control logic.
+The launch file automatically runs the `haptic_bridge.py` script for you. The code is located in `drone_ws/src/haptic_interface/scripts/haptic_bridge.py`.
+
 ```
-\#\!/usr/bin/env python3  
+#!/usr/bin/env python3  
 import rospy  
 import socket  
 import time  
@@ -166,12 +160,12 @@ if \_\_name\_\_ \== '\_\_main\_\_':
 
 You don't need to fly the drone manually to test this.
 
-1. **Launch everything:** Start Gazebo (Term 1), MAVROS (Term 2), and your Bridge (Term 3).  
-2. **inject Wind:** Go to the MAVProxy console (Term 1\) and type:  
-   param set SIM\_WIND\_SPD 15  
-   param set SIM\_WIND\_DIR 90
+1. **Launch the simulation:** Run `roslaunch haptic_interface start_simulation.launch`.
+2. **Inject Wind:** Go to the MAVProxy console (the separate terminal that opened) and type:  
+   `param set SIM_WIND_SPD 15`  
+   `param set SIM_WIND_DIR 90`
 
-3. **The Result:** \* The simulated drone will tilt to fight the wind.  
+3. **The Result:** * The simulated drone will tilt to fight the wind.  
    * The IMU will register this acceleration.  
    * Your script will print "TURBULENCE DETECTED\!" and send the data to the suit.  
    * **Your Suit should respond physically.**
