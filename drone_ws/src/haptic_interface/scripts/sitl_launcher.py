@@ -21,8 +21,9 @@ def launch_sitl():
     # Using xterm is a common way to launch a visible terminal from a ROS launch file.
     command = [
         'xterm',
+        '-hold',
         '-e',
-        './sim_vehicle.py -v ArduCopter -f gazebo-iris --console'
+        'python3 /home/nimbus-nuc/ardupilot/Tools/autotest/sim_vehicle.py -v ArduCopter -f gazebo-iris --console'
     ]
 
     try:
@@ -33,7 +34,7 @@ def launch_sitl():
         
         # We can wait for the process to complete, or just let it run.
         # Since this is a long-running process, we'll let it run and the node will exit.
-        # process.wait() 
+        process.wait() 
         
     except FileNotFoundError:
         rospy.logerr(f"SITL Launcher Error: The command 'xterm' was not found. Please ensure it is installed (`sudo apt-get install xterm`).")
