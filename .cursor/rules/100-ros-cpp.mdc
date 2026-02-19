@@ -1,0 +1,33 @@
+---
+description: Standards for C++ development in ROS nodes within the HapticSuit project.
+globs: ["drone_ws/**/*.cpp", "drone_ws/**/*.h", "drone_ws/**/*.hpp"]
+---
+# ROS C++ Standards
+
+## Naming Conventions
+- **Classes**: PascalCase (e.g., `LQRController`, `BiasEstimator`).
+- **Files**: snake_case (e.g., `lqr_control_bias.cpp`, `bias_estimator.h`).
+- **Variables**: snake_case.
+- **Member Variables**: snake_case with a trailing underscore (e.g., `nh_`, `priv_nh_`, `total_mass_`).
+- **Constants/Macros**: SCREAMING_SNAKE_CASE (e.g., `ROS_NODE_NAME`, `STATEFB_MISSING_INTRV_`).
+
+## Code Style
+- **Indentation**: 2 spaces.
+- **Braces**: Allman style (braces on new lines) is common in existing code, but consistent K&R is also acceptable if matched with surrounding code.
+- **Comments**: Use `//` for single-line and `/* ... */` for multi-line comments.
+
+## ROS Patterns
+- **Node Handles**:
+  - Use `ros::NodeHandle nh_` for public topics/services.
+  - Use `ros::NodeHandle priv_nh_("~")` for private parameters.
+- **Parameters**: Use `priv_nh_.param("param_name", variable, default_value)` to load parameters safely.
+- **Logging**: Use `ROS_INFO`, `ROS_WARN`, `ROS_ERROR` macros.
+- **Loops**: Use `ros::Rate` or `ros::Timer` for periodic execution.
+
+## Libraries
+- **Eigen3**: heavily used for matrix and vector operations (e.g., `Eigen::Matrix`, `Eigen::Vector3d`). Ensure `find_package(Eigen3 REQUIRED)` is in `CMakeLists.txt`.
+- **roscpp**: Standard ROS C++ library.
+
+## Headers
+- Use `#pragma once` for new header files.
+- For existing files, respect include guards if present.

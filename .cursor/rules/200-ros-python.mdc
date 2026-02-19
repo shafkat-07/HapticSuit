@@ -1,0 +1,27 @@
+---
+description: Standards for Python development in ROS nodes/scripts within the HapticSuit project.
+globs: ["drone_ws/**/*.py"]
+---
+# ROS Python Standards
+
+## File Structure
+- **Shebang**: Always start executable scripts with `#!/usr/bin/env python3`.
+- **Encoding**: No need for coding declaration in Python 3 unless specific requirements exist.
+- **Executable**: Ensure script files are executable (`chmod +x`).
+
+## Code Style
+- **Formatting**: Follow PEP 8 (4 spaces for indentation).
+- **Classes**: Use class-based structures for nodes to encapsulate state (publishers, subscribers, params).
+  - Example: `class HapticBridge:`
+- **Entry Point**: Use `if __name__ == '__main__':` block to initialize the node and spin.
+
+## ROS Patterns
+- **Initialization**: `rospy.init_node('node_name')`.
+- **Logging**: Use `rospy.loginfo()`, `rospy.logwarn()`, `rospy.logerr()` instead of `print()`.
+- **Parameters**: Use `rospy.get_param('~param_name', default_value)` for private parameters.
+- **Shutdown**: Handle `rospy.ROSInterruptException` gracefully.
+
+## Libraries
+- **numpy**: Used for numerical operations (e.g., `import numpy as np`).
+- **rospy**: Standard ROS Python library.
+- **message_filters**: Useful for synchronizing multiple topics if needed.

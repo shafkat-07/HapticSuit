@@ -1,0 +1,29 @@
+---
+description: Project structure and build system overview for the HapticSuit drone workspace.
+globs: ["drone_ws/**/*", "README.md"]
+---
+# Project Context: HapticSuit
+
+## Overview
+This project, **HapticSuit**, is a ROS 1 (Noetic) codebase designed to mimic external forces on a drone using a custom haptic suit. The core flight stack is based on the **Freyja** controller.
+
+## Directory Structure
+- **`drone_ws/`**: The main ROS workspace.
+  - **`src/Freyja/`**: Contains the core flight controller logic, including state estimation and LQG control.
+  - **`src/haptic_interface/`**: Contains the interface to the physical haptic suit hardware and kinematics solver.
+  - **`src/flight_controller/`**: Contains specific flight scenarios and launch files.
+
+## Build System
+- The project uses `catkin` (specifically `catkin_tools` is recommended for `catkin build`).
+- **Build Command**: `catkin build` (run from `drone_ws/`).
+- **Source Command**: `source devel/setup.bash` (run from `drone_ws/` after building).
+
+## Key Documentation
+- **Root README**: `README.md` (General overview).
+- **Freyja README**: `drone_ws/src/Freyja/README.md` (Flight stack details).
+- **Kinematics**: `kinematics/README.md` (Mathematical background).
+
+## Conventions
+- **ROS Version**: ROS 1 Noetic.
+- **Python Version**: Python 3.
+- **C++ Version**: C++14 (as seen in `CMakeLists.txt`).

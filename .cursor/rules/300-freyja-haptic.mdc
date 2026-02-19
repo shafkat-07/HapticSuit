@@ -1,0 +1,34 @@
+---
+description: Architecture details for Freyja flight controller and Haptic Suit interface.
+globs: ["drone_ws/src/Freyja/**/*", "drone_ws/src/haptic_interface/**/*"]
+---
+# Freyja & Haptic Architecture
+
+## Freyja Flight Stack
+The **Freyja** system is composed of three main layers:
+1.  **State Manager** (`state_manager`):
+    - Fuses data from Mocap (Vicon/Optitrack), GPS, and IMU.
+    - Outputs a unified state vector $\mathbf{x}$.
+2.  **LQG Controller** (`lqg_control`):
+    - Receives state $\mathbf{x}$ and reference $\mathbf{x}_r$.
+    - Computes optimal control input $\mathbf{u}$ using LQR + Kalman Filter (LQG).
+    - Handles bias compensation and mass estimation.
+3.  **Autopilot Handler** (`autopilot_handler`):
+    - Translates abstract control commands (Roll, Pitch, Yaw, Thrust) into autopilot-specific Mavlink messages (e.g., for Pixhawk/ArduPilot).
+
+## Haptic Interface
+The **Haptic Interface** manages the physical suit:
+- **`haptic_bridge.py`**:
+  - Subscribes to `/mavros/imu/data` (or similar force source).
+  - Calculates necessary forces ($F_x, F_y, F_z$).
+  - Solves Inverse Kinematics (IK) to find motor speeds ($w_i$) and angles ($q_i$).
+  - Sends commands via UDP to the suit's microcontroller (ESP32/Arduino).
+- **Kinematics**:
+  - Implemented in `kinematics_solver.py` (Python) and `kinematics/` (Matlab).
+  - Ensure consistent coordinate frames between ROS (ENU) and the Suit (Body Frame).
+
+## Launch Workflow
+- **Main Launch**: `roslaunch src/Freyja/freyja_controller.launch`
+  - Arguments: `total_mass`, `vicon_topic`, `start_rosbag`.
+- **Simulation**: `roslaunch haptic_interface start_simulation.launch`
+  - Launches Gazebo and the Haptic Bridge in simulation mode.
