@@ -1,6 +1,5 @@
 ---
-description: Project structure and build system overview for the HapticSuit drone workspace.
-globs: ["drone_ws/**/*", "README.md"]
+alwaysApply: true
 ---
 # Project Context: HapticSuit
 
