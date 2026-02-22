@@ -13,17 +13,15 @@ def launch_sitl():
     rospy.init_node('sitl_launcher', anonymous=True)
     rospy.loginfo("SITL Launcher: Starting sim_vehicle.py...")
 
-    # The sim_vehicle.py script must be run from its own directory.
-    sitl_directory = os.path.expanduser('~/ardupilot/ArduCopter')
-    
-    # We use Popen to launch the process in a new terminal window.
-    # The command must be broken into a list of arguments.
-    # Using xterm is a common way to launch a visible terminal from a ROS launch file.
+    home = os.path.expanduser('~')
+    sitl_directory = os.path.join(home, 'ardupilot', 'ArduCopter')
+    sim_vehicle_path = os.path.join(home, 'ardupilot', 'Tools', 'autotest', 'sim_vehicle.py')
+
     command = [
         'xterm',
         '-hold',
         '-e',
-        'python3 /home/nimbus-nuc/ardupilot/Tools/autotest/sim_vehicle.py -v ArduCopter -f gazebo-iris --console'
+        f'python3 {sim_vehicle_path} -v ArduCopter -f gazebo-iris --console'
     ]
 
     try:

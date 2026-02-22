@@ -1,0 +1,27 @@
+<launch>
+    <!-- Get home directory -->
+    <env name="HOME" value="$(env HOME)"/>
+    
+    <!-- Add custom models to GAZEBO_MODEL_PATH -->
+    <env name="GAZEBO_MODEL_PATH" value="$(find flight_controller)/models:$(optenv GAZEBO_MODEL_PATH)"/>
+
+    <!-- 1. Start Gazebo with the custom wind/payload world -->
+    <include file="$(find gazebo_ros)/launch/empty_world.launch">
+        <arg name="world_name" value="$(find flight_controller)/worlds/wind_payload.world"/>
+        <arg name="verbose" value="true"/>
+        <arg name="paused" value="false"/>
+    </include>
+
+    <!-- 2. Run the ArduPilot SITL using the existing launcher -->
+    <!-- Ensure sitl_launcher.py points to the correct ArduPilot installation -->
+    <node name="sitl" pkg="haptic_interface" type="sitl_launcher.py" output="screen"/>
+
+    <!-- 3. Launch the MAVROS bridge -->
+    <include file="$(find mavros)/launch/apm.launch">
+        <arg name="fcu_url" value="udp://:14550@"/>
+    </include>
+
+    <!-- 4. Start the Haptic Bridge Node -->
+    <node name="haptic_bridge" pkg="haptic_interface" type="haptic_bridge.py" output="screen"/>
+
+</launch>
