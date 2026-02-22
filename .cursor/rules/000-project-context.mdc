@@ -11,6 +11,10 @@ This project, **HapticSuit**, is a ROS 1 (Noetic) codebase designed to mimic ext
   - **`src/Freyja/`**: Contains the core flight controller logic, including state estimation and LQG control.
   - **`src/haptic_interface/`**: Contains the interface to the physical haptic suit hardware and kinematics solver.
   - **`src/flight_controller/`**: Contains specific flight scenarios and launch files.
+    - **`worlds/`**: Gazebo world files for simulation scenarios (one `.world` per scenario).
+    - **`models/`**: Custom Gazebo SDF models (e.g., `suspended_payload`).
+    - **`launch/`**: Launch files for each simulation scenario.
+    - **`src/`**: Python flight scripts (waypoint sequences, test maneuvers).
 
 ## Build System
 - The project uses `catkin` (specifically `catkin_tools` is recommended for `catkin build`).
@@ -21,8 +25,20 @@ This project, **HapticSuit**, is a ROS 1 (Noetic) codebase designed to mimic ext
 - **Root README**: `README.md` (General overview).
 - **Freyja README**: `drone_ws/src/Freyja/README.md` (Flight stack details).
 - **Kinematics**: `kinematics/README.md` (Mathematical background).
+- **Simulation Scenarios**: `drone_ws/src/flight_controller/worlds/README.md` (How to run each scenario, prerequisites, expected output).
+
+## External Dependencies (Simulation)
+- **ArduPilot SITL**: Installed at `~/ardupilot/`. Provides `sim_vehicle.py` for software-in-the-loop simulation.
+- **ardupilot_gazebo**: Installed at `~/ardupilot_gazebo/`. Provides the `iris_with_ardupilot` Gazebo model and the ArduPilot-Gazebo bridge plugin.
+- **Environment variables** required: `GAZEBO_MODEL_PATH` must include `~/ardupilot_gazebo/models` and `$(find flight_controller)/models`.
+
+## Simulation Architecture
+The simulation data flow is: **Gazebo physics** -> **ArduPilot SITL** -> **MAVROS** -> **haptic_bridge.py** -> **Haptic Suit (UDP)**.
+Forces are generated entirely by Gazebo's physics engine (wind, collisions, payload dynamics). The haptic suit reads and mirrors those forces -- it does NOT inject forces into the simulation.
 
 ## Conventions
 - **ROS Version**: ROS 1 Noetic.
 - **Python Version**: Python 3.
 - **C++ Version**: C++14 (as seen in `CMakeLists.txt`).
+- **Line Endings**: All scripts must use Unix (LF) line endings, not Windows (CRLF). CRLF causes exit code 127 on Linux when the shebang line is parsed.
+- **Simulation Scenarios**: Each scenario gets its own `.world` file in `worlds/`, a corresponding `.launch` file in `launch/`, and any custom models in `models/`.
