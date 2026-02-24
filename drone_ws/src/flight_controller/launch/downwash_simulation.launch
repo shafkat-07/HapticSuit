@@ -1,0 +1,32 @@
+<launch>
+    <!-- Get home directory -->
+    <env name="HOME" value="$(env HOME)"/>
+
+    <!-- Custom + ardupilot_gazebo models on the search path -->
+    <env name="GAZEBO_MODEL_PATH"
+         value="$(find flight_controller)/models:$(env HOME)/ardupilot_gazebo/models:$(optenv GAZEBO_MODEL_PATH)"/>
+
+    <!-- 1. Gazebo with the downwash world -->
+    <include file="$(find gazebo_ros)/launch/empty_world.launch">
+        <arg name="world_name" value="$(find flight_controller)/worlds/downwash.world"/>
+        <arg name="verbose"    value="true"/>
+        <arg name="paused"     value="false"/>
+    </include>
+
+    <!-- 2. ArduPilot SITL (opens in an xterm window) -->
+    <node name="sitl" pkg="haptic_interface" type="sitl_launcher.py" output="screen"/>
+
+    <!-- 3. MAVROS bridge to ArduPilot -->
+    <include file="$(find mavros)/launch/apm.launch">
+        <arg name="fcu_url" value="udp://:14550@"/>
+    </include>
+
+    <!-- 4. Haptic bridge (IMU → kinematics → UDP to suit) -->
+    <node name="haptic_bridge" pkg="haptic_interface" type="haptic_bridge.py" output="screen"/>
+
+    <!-- 5. Downwash force model (computes + applies wake forces on Drone A) -->
+    <node name="downwash_force" pkg="flight_controller" type="downwash_force.py" output="screen"/>
+
+    <!-- 6. Automated flight script (arms/takes-off Drone A, animates Drone B) -->
+    <node name="downwash_flight" pkg="flight_controller" type="downwash_flight.py" output="screen"/>
+</launch>

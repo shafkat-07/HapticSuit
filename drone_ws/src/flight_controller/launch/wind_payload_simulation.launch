@@ -24,4 +24,7 @@
     <!-- 4. Start the Haptic Bridge Node -->
     <node name="haptic_bridge" pkg="haptic_interface" type="haptic_bridge.py" output="screen"/>
 
+    <!-- 5. Automated flight script (arms, flies 10 m in +X, lands) -->
+    <node name="wind_payload_flight" pkg="flight_controller" type="wind_payload_flight.py" output="screen"/>
+
 </launch>
