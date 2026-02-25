@@ -130,3 +130,54 @@ rosrun haptic_interface mock_suit.py
 | Payload mass | `../models/suspended_payload/model.sdf` line 7 | `0.5` kg | `<mass>` value |
 | Payload size | `../models/suspended_payload/model.sdf` lines 19,25 | `0.05` m radius | `<radius>` in collision and visual |
 | Drone mass (haptic calc) | `haptic_bridge.py` line 21 | `1.5` kg | `DRONE_MASS` constant |
+
+---
+
+## Scenario: Wind Only (Fly Straight)
+
+**World file**: `wind_only.world`
+**Launch file**: `../launch/wind_only_simulation.launch`
+
+### Description
+
+An Iris drone takes off, flies 5 m in a straight line, and holds position. During flight the drone experiences:
+- **Constant wind** at 5 m/s in the +X direction (applied via Gazebo's native `WindPlugin`).
+
+There is no suspended payload in this scenario. It uses the standard `iris_with_ardupilot` model from the upstream `ardupilot_gazebo` package. This makes it useful as a baseline for isolating wind-only effects on the haptic suit output, without the additional pendulum dynamics of the payload scenario.
+
+The entire scenario is fully automated: arming, takeoff, and flight all happen via the python script.
+
+### How to Run
+
+You need **2 terminals**. Source ROS and the workspace in each one first:
+
+```bash
+source /opt/ros/noetic/setup.bash
+source ~/source/HapticSuit/drone_ws/devel/setup.bash
+```
+
+**Terminal 1 -- Gazebo + MAVROS + Haptic Bridge:**
+
+```bash
+roslaunch flight_controller wind_only_simulation.launch
+```
+
+**Terminal 2 -- Flight Script:**
+
+```bash
+rosrun flight_controller fly_straight_wind.py
+```
+
+### What You Should See
+
+1.  **Gazebo window**: The Iris drone takes off to 2m, waits 10s, then flies 5m forward in the +X direction. The wind (5m/s) is active, though the visual effect on the drone body may be subtle with the standard model.
+2.  **Terminal 2**: The script logs progress: connecting to FCU, switching to GUIDED mode, arming, taking off, and flying to the target.
+3.  **Haptic suit**: Receives UDP packets reflecting the forces the drone is experiencing (mainly wind drag).
+
+### Tuning Parameters
+
+| Parameter | File | Default | Description |
+|---|---|---|---|
+| Wind speed/direction | `wind_only.world` | `5 0 0` | Change `<linear_velocity>` |
+| Flight Distance | `fly_straight_wind.py` | `5.0` m | `target_pose.pose.position.x` |
+| Hover Altitude | `fly_straight_wind.py` | `2.0` m | `target_pose.pose.position.z` |
