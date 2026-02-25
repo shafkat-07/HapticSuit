@@ -143,3 +143,39 @@ rosrun flight_controller fly_straight_wind.py
 1.  **Gazebo window**: The drone takes off with a red spherical payload hanging below it. The payload will swing as the drone maneuvers and reacts to the wind.
 2.  **Terminal 2**: Same flight sequence as the wind-only scenario.
 3.  **Haptic suit**: Forces will now include the oscillating pull of the swinging payload in addition to the wind drag.
+
+---
+
+## Scenario: Collision + Suspended Payload
+
+**World file**: `collision_payload.world`
+**Launch file**: `../launch/collision_payload_simulation.launch`
+
+### Description
+
+In this scenario, there is **no wind**. The drone (with suspended payload) flies a straight path that is obstructed by a stationary object.
+
+- **Obstacle**: A red 1x1x1m box located at `x=2.5, y=0, z=1.3`. The top of the box is at `z=1.8m`.
+- **Flight Path**: From origin `(0,0,2)` to target `(5,0,2)`.
+- **Payload**: Suspended approx 0.3m below the drone (at `z~1.7m`).
+
+The drone (at `z=2.0m`) should **fly over** the box, but the **hanging payload** should collide with it. This tests the haptic response to payload impact forces while the drone remains relatively stable (initially).
+
+### How to Run
+
+**Terminal 1 -- Gazebo + MAVROS + Haptic Bridge:**
+
+```bash
+roslaunch flight_controller collision_payload_simulation.launch
+```
+
+**Terminal 2 -- Flight Script:**
+
+```bash
+rosrun flight_controller fly_straight_collision.py
+```
+
+### What You Should See
+
+1.  **Gazebo window**: Drone takes off to 2m, flies forward. The drone body clears the red box, but the spherical payload dragging below smashes into it.
+2.  **Haptic suit**: Should receive a sharp tug/impact force as the payload snags on the obstacle.

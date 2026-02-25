@@ -1,0 +1,82 @@
+<?xml version="1.0" ?>
+<sdf version="1.6">
+  <world name="default">
+
+    <!-- No wind in this scenario -->
+
+    <!-- Global light source -->
+    <include>
+      <uri>model://sun</uri>
+    </include>
+
+    <!-- Ground plane -->
+    <include>
+      <uri>model://ground_plane</uri>
+    </include>
+
+    <!--
+      Iris Drone with Payload.
+    -->
+    <include>
+      <uri>model://iris_with_ardupilot_payload</uri>
+      <name>iris_demo</name>
+      <pose>0 0 0.194 0 0 0</pose>
+    </include>
+
+    <!--
+      Static Box Obstacle
+      Located at x=2.5, y=0, z=1.3 (Top surface at z=1.8m)
+      Size: 1m x 1m x 1m
+      Goal: Drone (at z=2.0m) clears it, but Payload (at z~1.7m) hits it.
+    -->
+    <model name="box_obstacle">
+      <pose>2.5 0 1.3 0 0 0</pose>
+      <static>true</static>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <box>
+              <size>1 1 1</size>
+            </box>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>1 1 1</size>
+            </box>
+          </geometry>
+          <material>
+            <script>
+              <uri>file://media/materials/scripts/gazebo.material</uri>
+              <name>Gazebo/Red</name>
+            </script>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- Physics settings -->
+    <physics type="ode">
+      <real_time_update_rate>1000.0</real_time_update_rate>
+      <max_step_size>0.001</max_step_size>
+      <real_time_factor>1</real_time_factor>
+      <ode>
+        <solver>
+          <type>quick</type>
+          <iters>150</iters>
+          <precon_iters>0</precon_iters>
+          <sor>1.400000</sor>
+          <use_dynamic_moi_rescaling>1</use_dynamic_moi_rescaling>
+        </solver>
+        <constraints>
+          <cfm>0.00001</cfm>
+          <erp>0.2</erp>
+          <contact_max_correcting_vel>2000.000000</contact_max_correcting_vel>
+          <contact_surface_layer>0.01000</contact_surface_layer>
+        </constraints>
+      </ode>
+    </physics>
+
+  </world>
+</sdf>
