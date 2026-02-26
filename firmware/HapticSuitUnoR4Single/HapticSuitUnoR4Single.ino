@@ -1,9 +1,18 @@
+#include <sh2.h>
+#include <sh2_SensorValue.h>
+#include <sh2_err.h>
+#include <sh2_hal.h>
+#include <sh2_util.h>
+#include <shtp.h>
+
+
 #include <SPI.h>
 #include <Wire.h>
 #include <Servo.h>
 #include <WiFiS3.h>    // UNO R4 WiFi network driver
 #include <WiFiUdp.h>
-#include "SparkFun_BNO080_Arduino_Library.h"
+#include <SparkFun_BNO08x_Arduino_Library.h>
+
 
 // Local PID helper
 #include "PID.cpp"
@@ -51,7 +60,7 @@ const int dir2Pins[NUM_ARMS] = {11, 7,  A1, A3};
 const int stbyPin            = 13; // STBY tied to both TB6612 boards
 
 // IMUs (via TCA9548A on Wire1), one per arm
-BNO080 imu_array[NUM_ARMS];
+BNO08x imu_array[NUM_ARMS];
 
 // IMU / control state
 float current_roll[NUM_ARMS];
@@ -239,7 +248,7 @@ void setup()
     Serial.println(k);
 
     tcaSelect(k);
-    imu_success[k] = imu_array[k].begin(BNO080_DEFAULT_ADDRESS, Wire1);
+    imu_success[k] = imu_array[k].begin(BNO08x_DEFAULT_ADDRESS, Wire1);
 
     if (imu_success[k] == false)
     {
@@ -335,13 +344,16 @@ void loop()
     }
   }
 
-  // Get the latest IMU data
+  // Get the latest IMU data (BNO08x API)
   for (int k = 0; k < NUM_ARMS; k++)
   {
     tcaSelect(k);
-    if (imu_array[k].dataAvailable() == true)
+
+    // getSensorEvent() updates sensorValue and returns true when new data arrives
+    if (imu_array[k].getSensorEvent())
     {
-      current_roll[k] = imu_array[k].getRoll() * 180.0 / PI;
+      // We enabled the rotation vector, so getRoll() is valid here
+      current_roll[k] = imu_array[k].getRoll(); // already in degrees
       global_roll[k]  = update_global_roll(current_roll[k], previous_roll[k], &roll_state[k]);
       previous_roll[k] = current_roll[k];
     }
