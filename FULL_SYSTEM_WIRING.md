@@ -77,9 +77,88 @@ This guide details how to wire the entire system: 2 Microcontrollers (Master & S
 
 ---
 
-### Summary Checklist
+### Summary Checklist (Master/Slave Layout)
 - [ ] **GND Shared:** Master, Slave, and all components connected to Blue Rail.
 - [ ] **Serial Crossed:** Master TX->Slave RX, Master RX->Slave TX.
 - [ ] **I2C Separated:** Master has 2 IMUs, Slave has 2 IMUs.
 - [ ] **Motors Split:** Master controls ESC 1&2, Slave controls ESC 3&4.
+
+---
+
+## Uno R4 WiFi Single‑Board Variant (Monoboard)
+
+The new **monoboard** architecture replaces the dual‑Feather Master/Slave layout with a **single Arduino UNO R4 WiFi** plus:
+
+- 1× **TCA9548A** I2C multiplexer
+- 4× **BNO086** IMUs (one per arm)
+- 2× **TB6612FNG** motor drivers (rotation motors, 2 per board)
+- 4× **ESCs** (thrust motors)
+
+For full bench wiring details, see `[monoboard_wiring_guide.md](monoboard_wiring_guide.md)`. The key pin mappings that the firmware uses are summarized here.
+
+### 1. IMU / I2C (UNO R4 Qwiic → TCA9548A → 4× BNO086)
+
+- UNO R4 WiFi **Qwiic port** (3.3 V, I2C `Wire1`) connects to the **TCA9548A**:
+  - Qwiic 3.3V → TCA9548A VCC
+  - Qwiic GND → TCA9548A GND
+  - Qwiic SDA → TCA9548A SDA
+  - Qwiic SCL → TCA9548A SCL
+- TCA9548A channel mapping to IMUs:
+  - Arm 1 IMU → channel 0 (SDA0/SCL0)
+  - Arm 2 IMU → channel 1 (SDA1/SCL1)
+  - Arm 3 IMU → channel 2 (SDA2/SCL2)
+  - Arm 4 IMU → channel 3 (SDA3/SCL3)
+- In firmware, IMUs are accessed over **`Wire1`** with a TCA channel‑select helper before each read.
+
+### 2. Rotation Motors (2× TB6612FNG)
+
+Both TB6612 boards share:
+
+- VCC (logic) → UNO **5V**
+- GND → UNO **GND**
+- VM (motor supply) → external motor voltage (6–12 V as needed)
+- STBY → UNO **D13** (both boards tied together)
+
+Per‑arm control pins (matching `monoboard_wiring_guide.md`, and used by the Uno firmware):
+
+| Arm | TB6612 Channel | PWM pin | DIR1 | DIR2 |
+| --- | -------------- | ------: | ---: | ---: |
+| Arm 1 rotation | TB6612 #1 / A | **D3** | **D10** | **D11** |
+| Arm 2 rotation | TB6612 #1 / B | **D5** | **D12** | **D7** |
+| Arm 3 rotation | TB6612 #2 / A | **D6** | **A0** | **A1** |
+| Arm 4 rotation | TB6612 #2 / B | **D9** | **A2** | **A3** |
+
+The Uno R4 single‑board firmware configures these as:
+
+- `STBY` output (D13) driven HIGH
+- One PWM + two DIR pins per arm for the TB6612 driver.
+
+### 3. ESC Thrust Outputs
+
+Each ESC receives:
+
+- Signal (PWM/servo pulse) from an Arduino digital pin
+- Signal ground tied to **UNO GND**
+
+UNO R4 WiFi pin mapping (used directly in the Uno firmware):
+
+| Arm | ESC Signal Pin |
+| --- | -------------: |
+| Arm 1 thruster | **D2** |
+| Arm 2 thruster | **D4** |
+| Arm 3 thruster | **D8** |
+| Arm 4 thruster | **A4** (used as digital) |
+
+### 4. Power and Grounding (Monoboard)
+
+The monoboard wiring keeps the same **single common ground** requirement:
+
+- UNO GND
+- TCA9548A GND
+- All IMU GNDs
+- Both TB6612 GNDs
+- External DC motor supply GND
+- ESC signal ground (and ESC power GND)
+
+Refer to `[monoboard_wiring_guide.md](monoboard_wiring_guide.md)` for the recommended bring‑up order (IMUs → rotation motors → ESCs) and additional safety notes.
 
