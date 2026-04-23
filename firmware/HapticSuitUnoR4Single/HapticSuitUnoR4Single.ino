@@ -1,17 +1,8 @@
-#include <sh2.h>
-#include <sh2_SensorValue.h>
-#include <sh2_err.h>
-#include <sh2_hal.h>
-#include <sh2_util.h>
-#include <shtp.h>
-
-
-#include <SPI.h>
 #include <Wire.h>
 #include <Servo.h>
 #include <WiFiS3.h>    // UNO R4 WiFi network driver
 #include <WiFiUdp.h>
-#include <SparkFun_BNO08x_Arduino_Library.h>
+#include <MadgwickAHRS.h>
 
 
 // Local PID helper
@@ -60,7 +51,29 @@ const int dir2Pins[NUM_ARMS] = {11, 7,  A1, A3};
 const int stbyPin            = 13; // STBY tied to both TB6612 boards
 
 // IMUs (via TCA9548A on Wire1), one per arm
-BNO08x imu_array[NUM_ARMS];
+Madgwick fusion[NUM_ARMS];
+
+static const uint8_t MPU6050_ADDR_PRIMARY = 0x68;
+static const uint8_t MPU6050_ADDR_AD0_HIGH = 0x69;
+
+static const uint8_t REG_WHO_AM_I = 0x75;
+static const uint8_t REG_PWR_MGMT_1 = 0x6B;
+static const uint8_t REG_ACCEL_CONFIG = 0x1C;
+static const uint8_t REG_GYRO_CONFIG = 0x1B;
+static const uint8_t REG_ACCEL_XOUT_H = 0x3B;
+
+static const uint8_t WHO_AM_I_EXPECTED = 0x68;
+
+static const float ACCEL_LSB_PER_G = 16384.0f;
+static const float GYRO_LSB_PER_DPS = 131.0f;
+
+static uint8_t g_mpuAddress[NUM_ARMS];
+
+static float g_biasGx[NUM_ARMS];
+static float g_biasGy[NUM_ARMS];
+static float g_biasGz[NUM_ARMS];
+
+bool imu_success[NUM_ARMS] = {false, false, false, false};
 
 // IMU / control state
 float current_roll[NUM_ARMS];
@@ -105,6 +118,107 @@ void tcaSelect(uint8_t channel)
   Wire1.beginTransmission(TCA_ADDR);
   Wire1.write(1 << channel);
   Wire1.endTransmission();
+}
+
+static bool i2cWrite8(uint8_t devAddr, uint8_t reg, uint8_t value) {
+  Wire1.beginTransmission(devAddr);
+  Wire1.write(reg);
+  Wire1.write(value);
+  return Wire1.endTransmission() == 0;
+}
+
+static bool i2cReadBytes(uint8_t devAddr, uint8_t reg, uint8_t *buf, uint8_t len) {
+  Wire1.beginTransmission(devAddr);
+  Wire1.write(reg);
+  if (Wire1.endTransmission(false) != 0) {
+    return false;
+  }
+  const size_t got = Wire1.requestFrom(devAddr, len);
+  if (got != len) {
+    return false;
+  }
+  for (uint8_t i = 0; i < len; i++) {
+    buf[i] = Wire1.read();
+  }
+  return true;
+}
+
+static bool mpuProbe(uint8_t addr, uint8_t *whoAmIOut) {
+  uint8_t w = 0;
+  if (!i2cReadBytes(addr, REG_WHO_AM_I, &w, 1)) {
+    return false;
+  }
+  *whoAmIOut = w;
+  return (w == WHO_AM_I_EXPECTED);
+}
+
+static bool mpuInit(uint8_t addr) {
+  if (!i2cWrite8(addr, REG_PWR_MGMT_1, 0x00)) {
+    return false;
+  }
+  delay(10);
+  if (!i2cWrite8(addr, REG_ACCEL_CONFIG, 0x00)) {
+    return false;
+  }
+  if (!i2cWrite8(addr, REG_GYRO_CONFIG, 0x00)) {
+    return false;
+  }
+  return true;
+}
+
+static void remapImuFrame(float axIn, float ayIn, float azIn, float gxIn, float gyIn, float gzIn,
+ float *axOut, float *ayOut, float *azOut, float *gxOut, float *gyOut, float *gzOut) {
+  *axOut = axIn;
+  *ayOut = ayIn;
+  *azOut = azIn;
+  *gxOut = gxIn;
+  *gyOut = gyIn;
+  *gzOut = gzIn;
+}
+
+static bool readMpuScaled(uint8_t devAddr, float *axg, float *ayg, float *azg, float *gxd, float *gyd, float *gzd) {
+  uint8_t buf[14];
+  if (!i2cReadBytes(devAddr, REG_ACCEL_XOUT_H, buf, sizeof(buf))) {
+    return false;
+  }
+  const int16_t rax = static_cast<int16_t>((buf[0] << 8) | buf[1]);
+  const int16_t ray = static_cast<int16_t>((buf[2] << 8) | buf[3]);
+  const int16_t raz = static_cast<int16_t>((buf[4] << 8) | buf[5]);
+  const int16_t rgx = static_cast<int16_t>((buf[8] << 8) | buf[9]);
+  const int16_t rgy = static_cast<int16_t>((buf[10] << 8) | buf[11]);
+  const int16_t rgz = static_cast<int16_t>((buf[12] << 8) | buf[13]);
+
+  *axg = rax / ACCEL_LSB_PER_G;
+  *ayg = ray / ACCEL_LSB_PER_G;
+  *azg = raz / ACCEL_LSB_PER_G;
+  *gxd = rgx / GYRO_LSB_PER_DPS;
+  *gyd = rgy / GYRO_LSB_PER_DPS;
+  *gzd = rgz / GYRO_LSB_PER_DPS;
+  return true;
+}
+
+static void calibrateGyroBias(uint8_t mpuAddr, float *biasGx, float *biasGy, float *biasGz,
+ uint16_t settleMs, uint16_t sampleCount) {
+  delay(settleMs);
+  double sx = 0.0, sy = 0.0, sz = 0.0;
+  uint16_t ok = 0;
+  for (uint16_t i = 0; i < sampleCount; i++) {
+    float ax, ay, az, gx, gy, gz;
+    if (readMpuScaled(mpuAddr, &ax, &ay, &az, &gx, &gy, &gz)) {
+      sx += gx;
+      sy += gy;
+      sz += gz;
+      ok++;
+    }
+    delay(5);
+  }
+  if (ok == 0) {
+    *biasGx = *biasGy = *biasGz = 0.0f;
+    return;
+  }
+  *biasGx = static_cast<float>(sx / ok);
+  *biasGy = static_cast<float>(sy / ok);
+  *biasGz = static_cast<float>(sz / ok);
 }
 
 // Control the spinning rotation motors via TB6612
@@ -238,8 +352,6 @@ void setup()
   Wire1.setClock(400000); // 400 kHz
   delay(10);
 
-  bool imu_success[NUM_ARMS] = {false, false, false, false};
-
   for (int k = 0; k < NUM_ARMS; k++)
   {
     Serial.print("Attempting to connect to IMU for Arm ");
@@ -248,30 +360,37 @@ void setup()
     Serial.println(k);
 
     tcaSelect(k);
-    imu_success[k] = imu_array[k].begin(BNO08x_DEFAULT_ADDRESS, Wire1);
+    delay(10);
 
-    if (imu_success[k] == false)
-    {
+    uint8_t who = 0;
+    if (mpuProbe(MPU6050_ADDR_PRIMARY, &who)) {
+      g_mpuAddress[k] = MPU6050_ADDR_PRIMARY;
+      imu_success[k] = true;
+    } else if (mpuProbe(MPU6050_ADDR_AD0_HIGH, &who)) {
+      g_mpuAddress[k] = MPU6050_ADDR_AD0_HIGH;
+      imu_success[k] = true;
+    } else {
       Serial.print("  FAILED to connect to IMU on channel ");
       Serial.println(k);
+      imu_success[k] = false;
+      continue;
     }
-    else
-    {
-      Serial.print("  SUCCESS: IMU connected on channel ");
-      Serial.println(k);
-    }
-    delay(100);
-  }
 
-  Serial.println("Enabling rotation vectors on IMUs");
-  for (int k = 0; k < NUM_ARMS; k++)
-  {
-    if (imu_success[k])
-    {
-      tcaSelect(k);
-      imu_array[k].enableRotationVector(5); // 5 ms update
-      delay(10);
+    if (!mpuInit(g_mpuAddress[k])) {
+      Serial.print("  FAILED to init IMU on channel ");
+      Serial.println(k);
+      imu_success[k] = false;
+      continue;
     }
+
+    Serial.print("  SUCCESS: IMU connected on channel ");
+    Serial.println(k);
+
+    Serial.print("  Calibrating gyro bias... ");
+    calibrateGyroBias(g_mpuAddress[k], &g_biasGx[k], &g_biasGy[k], &g_biasGz[k], 500, 200);
+    Serial.println("Done.");
+
+    fusion[k].begin((float)LOOP_RATE);
   }
 
   // WiFi / UDP setup (optional)
@@ -344,16 +463,25 @@ void loop()
     }
   }
 
-  // Get the latest IMU data (BNO08x API)
+  // Get the latest IMU data (GY-521 + Madgwick API)
   for (int k = 0; k < NUM_ARMS; k++)
   {
+    if (!imu_success[k]) continue;
+
     tcaSelect(k);
 
-    // getSensorEvent() updates sensorValue and returns true when new data arrives
-    if (imu_array[k].getSensorEvent())
-    {
-      // We enabled the rotation vector, so getRoll() is valid here
-      current_roll[k] = imu_array[k].getRoll(); // already in degrees
+    float axg, ayg, azg, gxd, gyd, gzd;
+    if (readMpuScaled(g_mpuAddress[k], &axg, &ayg, &azg, &gxd, &gyd, &gzd)) {
+      gxd -= g_biasGx[k];
+      gyd -= g_biasGy[k];
+      gzd -= g_biasGz[k];
+
+      float axf, ayf, azf, gxf, gyf, gzf;
+      remapImuFrame(axg, ayg, azg, gxd, gyd, gzd, &axf, &ayf, &azf, &gxf, &gyf, &gzf);
+
+      fusion[k].updateIMU(gxf, gyf, gzf, axf, ayf, azf);
+
+      current_roll[k] = fusion[k].getRoll(); // already in degrees
       global_roll[k]  = update_global_roll(current_roll[k], previous_roll[k], &roll_state[k]);
       previous_roll[k] = current_roll[k];
     }

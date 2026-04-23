@@ -1,10 +1,10 @@
-# 4-Arm Haptic Suit — Full Pin / Wiring Layout (UNO R4 WiFi + TCA9548A + 4× BNO086 + 2× TB6612 + 4× ESC)
+# 4-Arm Haptic Suit — Full Pin / Wiring Layout (UNO R4 WiFi + TCA9548A + 4× GY-521 (MPU6050) + 2× TB6612 + 4× ESC)
 
 This document is the full bench-test wiring plan for validating all 4 arms before mounting on the drone.
 
 ## System Overview (What’s Connected)
 - Microcontroller: **Arduino UNO R4 WiFi**
-- IMU bus: **TCA9548A I2C multiplexer** + **4× BNO086** (one per arm)
+- IMU bus: **TCA9548A I2C multiplexer** + **4× GY-521 (MPU6050)** (one per arm)
 - Arm rotation: **4× DC gearmotors** driven by **2× TB6612FNG** (2 motors per TB6612)
 - Thrust: **4× ESC signal outputs** (one per arm, for brushless motors)
 
@@ -27,7 +27,7 @@ Notes:
 - This keeps the entire IMU bus at **3.3V**.
 - In Arduino code, Qwiic I2C on UNO R4 WiFi is typically accessed via **Wire1**.
 
-### A2. TCA9548A → 4× BNO086 (one per channel)
+### A2. TCA9548A → 4× GY-521 (one per channel)
 Recommended channel mapping:
 
 | Arm | TCA9548A Channel | Pins on TCA9548A |
@@ -39,11 +39,11 @@ Recommended channel mapping:
 
 For each IMU, connect:
 
-| TCA9548A | BNO086 |
+| TCA9548A | GY-521 |
 |---|---|
 | SDAx | SDA |
 | SCLx | SCL |
-| 3.3V (VCC rail) | 3.3V / VIN (depends on breakout) |
+| 3.3V (VCC rail) | VCC (or VIN, depends on breakout) |
 | GND | GND |
 
 Where `x` is the channel number (0–3).
