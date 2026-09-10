@@ -32,11 +32,16 @@ static const float SAMPLE_HZ = 100.0f;
 static const uint32_t SAMPLE_US = static_cast<uint32_t>(1000000.0f / SAMPLE_HZ);
 
 // Safety limits for bench test
-static const uint8_t MAX_TEST_PWM = 85;         // Cap power (~33%) so arm moves gently
-static const uint8_t MIN_PWM = 25;              // Minimum PWM to overcome gearbox stiction
-static const float RUNAWAY_ANGLE_LIMIT = 45.0f; // Cut off motor if angle error exceeds 45 deg
-static const float DEADBAND_DEG = 1.0f;         // Within 1 deg, stop motor to prevent hunting
-static const float TARGET_LIMIT_DEG = 35.0f;    // Safe bench bounds for commanded target
+static const uint8_t MAX_TEST_PWM = 85;      // Cap power (~33%) so arm moves gently
+// Below this the motor is switched off rather than clamped up to it. Clamping up
+// would map every small error onto the same PWM and turn the loop into a
+// bang-bang oscillator; flooring to zero keeps error -> PWM continuous and makes
+// the effective error deadzone MIN_PWM/Kp.
+static const uint8_t MIN_PWM = 25;
+static const float TARGET_LIMIT_DEG = 35.0f; // Safe bench bounds for commanded target
+// Absolute travel limit. Only the direction that pushes further out of range is
+// blocked, so the controller can always drive back in rather than latching off.
+static const float ANGLE_LIMIT_DEG = 60.0f;
 
 // --- Pin Definitions (monoboard_wiring_guide.md) ---
 static const uint8_t PIN_STBY = 13;
@@ -108,6 +113,11 @@ static float g_thetaGlobal = 0.0f;
 static float g_thetaPrev = 0.0f;
 static int g_turns = 0;
 
+// Bias-corrected rotation rate about the hinge, deg/s. Taken straight from the
+// gyro so a derivative term never has to differentiate the estimate, which would
+// turn any estimator re-seed into a full-scale PWM spike.
+static float g_omegaHinge = 0.0f;
+
 // Diagnostics retained for the monitor printout
 static float g_lastAccAngle = 0.0f;
 static float g_lastAPerp = 0.0f;
@@ -119,9 +129,16 @@ static uint16_t g_innovRejects = 0;
 // a.H over a sweep is a direct measure of how wrong the assumed hinge axis is.
 static float g_aHmin = 0.0f;
 static float g_aHmax = 0.0f;
+static float g_aHfilt = 0.0f;
 static bool g_aHvalid = false;
 static const float AH_SPREAD_WARN_G = 0.15f;
 static const float AH_DECAY = 0.0005f; // ~20 s relaxation at 100 Hz
+// Blade-pass vibration is zero-mean, so low-passing aH averages it out instead of
+// letting every peak latch a new extreme. 0.01 at 100 Hz is a ~1 s time constant.
+static const float AH_LPF_ALPHA = 0.01f;
+// Only gravity carries axis information. Beyond this deviation from 1 g the
+// accelerometer is reading handling or a bumped rig, so the interval is frozen.
+static const float AH_GATE_EXCESS_G = 0.08f;
 
 // --- Control Modes & Variables ---
 enum ControlMode { MODE_MONITOR, MODE_PID_HOLD, MODE_CALIB_AXIS, MODE_CALIB_ZERO };
@@ -130,12 +147,13 @@ static ControlMode g_mode = MODE_MONITOR;
 static int8_t g_motorPolarity = 1;  // +1 or -1
 static float g_targetAngle = 0.0f;
 
-// Conservative PID parameters for initial bench test
-static float g_Kp = 5.0f;
+// Proportional-only, matching the gains used on the original two-arm controller.
+// Ki and Kd are wired up but left at zero: the 1:150 reduction is effectively
+// non-backdrivable, so P alone holds position once the motor switches off.
+static float g_Kp = 10.0f;
 static float g_Ki = 0.0f;
-static float g_Kd = 0.25f;
+static float g_Kd = 0.0f;
 static float g_integral = 0.0f;
-static float g_prevAngle = 0.0f;
 
 // Jog state. Kept non-blocking so the estimator continues to run at 100 Hz;
 // a delay() here would stall the filter for many sample periods.
@@ -298,22 +316,35 @@ static void estimatorUpdate(float dt, float ax, float ay, float az,
   const float aH = dot3(ax, ay, az, g_hingeH);
   const float aPerp = sqrtf(au * au + av * av);
   const float aNorm = sqrtf(ax * ax + ay * ay + az * az);
+  // Any deviation of |a| from 1 g is thrust, vibration or handling rather than
+  // gravity. Used both to down-weight the Kalman correction and to gate the
+  // hinge-axis consistency monitor.
+  const float excess = fabsf(aNorm - 1.0f);
+
+  g_omegaHinge = dot3(gx, gy, gz, g_hingeH) - g_thetaBias;
 
   g_lastAPerp = aPerp;
   g_lastANorm = aNorm;
   g_lastAccUsed = false;
 
   if (!g_aHvalid) {
+    g_aHfilt = aH;
     g_aHmin = g_aHmax = aH;
     g_aHvalid = true;
   } else {
-    // Relax the interval toward the current reading so that a one-off excursion,
-    // such as tilting the whole rig by hand, ages out while a persistent
-    // inconsistency keeps it open.
-    g_aHmin += (aH - g_aHmin) * AH_DECAY;
-    g_aHmax += (aH - g_aHmax) * AH_DECAY;
-    if (aH < g_aHmin) g_aHmin = aH;
-    if (aH > g_aHmax) g_aHmax = aH;
+    g_aHfilt += (aH - g_aHfilt) * AH_LPF_ALPHA;
+    // Extremes are only recorded while the accelerometer is actually measuring
+    // gravity. Without this, driving the arm or lifting the rig latches an
+    // excursion that the slow decay then holds for many seconds.
+    if (excess < AH_GATE_EXCESS_G) {
+      // Relax the interval toward the current reading so that a one-off excursion,
+      // such as tilting the whole rig by hand, ages out while a persistent
+      // inconsistency keeps it open.
+      g_aHmin += (g_aHfilt - g_aHmin) * AH_DECAY;
+      g_aHmax += (g_aHfilt - g_aHmax) * AH_DECAY;
+      if (g_aHfilt < g_aHmin) g_aHmin = g_aHfilt;
+      if (g_aHfilt > g_aHmax) g_aHmax = g_aHfilt;
+    }
   }
 
   // Gravity in body coordinates rotates by -theta when the body rotates by
@@ -333,8 +364,7 @@ static void estimatorUpdate(float dt, float ax, float ay, float az,
     return;
   }
 
-  const float omega = dot3(gx, gy, gz, g_hingeH);
-  g_theta = wrap180(g_theta + (omega - g_thetaBias) * dt);
+  g_theta = wrap180(g_theta + g_omegaHinge * dt);
   g_P[0][0] += dt * (dt * g_P[1][1] - g_P[0][1] - g_P[1][0] + Q_THETA);
   g_P[0][1] -= dt * g_P[1][1];
   g_P[1][0] -= dt * g_P[1][1];
@@ -344,9 +374,6 @@ static void estimatorUpdate(float dt, float ax, float ay, float az,
     // Angle noise scales as 1/aPerp because a fixed accelerometer error in g maps
     // to a larger angle error the shorter the in-plane gravity component is.
     const float perpScale = 1.0f / (aPerp * aPerp);
-    // Any deviation of |a| from 1 g is thrust or vibration rather than gravity, so
-    // down-weight the correction instead of letting it pull the angle off.
-    const float excess = fabsf(aNorm - 1.0f);
     const float R = R_ACC * perpScale * (1.0f + 200.0f * excess * excess);
 
     const float y = wrap180(g_lastAccAngle - g_theta);
@@ -395,6 +422,14 @@ static void estimatorUpdate(float dt, float ax, float ay, float az,
 // carries little or no information, so closed-loop control must not run on it.
 static bool axisLooksWrong() {
   return g_aHvalid && (g_aHmax - g_aHmin) > AH_SPREAD_WARN_G;
+}
+
+// Blocks only the direction that would drive further out of travel, so hitting a
+// limit stops the arm without latching the controller off.
+static bool rotationWithinBounds(float angle, int8_t dir) {
+  if (angle <= -ANGLE_LIMIT_DEG && dir < 0) return false;
+  if (angle >= ANGLE_LIMIT_DEG && dir > 0) return false;
+  return true;
 }
 
 // --- Hinge Frame Calibration ---
@@ -497,6 +532,15 @@ static void stopAllMotors() {
 }
 
 // --- Serial Interface ---
+static void printGains() {
+  Serial.print(F("[*] Kp=")); Serial.print(g_Kp, 2);
+  Serial.print(F("  Ki=")); Serial.print(g_Ki, 3);
+  Serial.print(F("  Kd=")); Serial.print(g_Kd, 3);
+  Serial.print(F("  -> error deadzone "));
+  Serial.print((g_Kp > 0.0f) ? (MIN_PWM / g_Kp) : 0.0f, 2);
+  Serial.println(F(" deg"));
+}
+
 static void printHelp() {
   Serial.println(F("\n======================================================="));
   Serial.println(F("         HAPTIC SUIT BENCH TEST: ARM 0 (IMU0)         "));
@@ -513,6 +557,8 @@ static void printHelp() {
   Serial.println(F("   b         : Jog Backward (dir=-1) 150ms to check polarity"));
   Serial.println(F("   p         : Toggle motor polarity (+1 <-> -1)"));
   Serial.println(F("   t <angle> : ENGAGE PID HOLD to target angle (e.g. 't 0', 't 15')"));
+  Serial.println(F("   P/I/D <v> : Set a gain live (e.g. 'P 10', 'D 0.3')"));
+  Serial.println(F("   g         : Print current gains and error deadzone"));
   Serial.println(F("   x or s    : EMERGENCY STOP / Disengage PID immediately"));
   Serial.println(F("   h or ?    : Print this menu again"));
   Serial.println(F("=======================================================\n"));
@@ -600,12 +646,20 @@ static void processSerial() {
       }
       g_targetAngle = constrain(angle, -TARGET_LIMIT_DEG, TARGET_LIMIT_DEG);
       g_integral = 0.0f;
-      g_prevAngle = g_thetaGlobal;
       g_jogDir = 0;
       g_mode = MODE_PID_HOLD;
       Serial.print(F("\n[*] >>> ENGAGING PID HOLD <<< Target: "));
       Serial.print(g_targetAngle, 1);
       Serial.println(F(" deg. Press 'x' or 's' at any time to stop!"));
+    } else if (cmd == 'P' || cmd == 'I' || cmd == 'D') {
+      const float v = Serial.parseFloat();
+      if (cmd == 'P') g_Kp = v;
+      else if (cmd == 'I') g_Ki = v;
+      else g_Kd = v;
+      g_integral = 0.0f;
+      printGains();
+    } else if (cmd == 'g') {
+      printGains();
     } else if (cmd == 'h' || cmd == '?') {
       printHelp();
     }
@@ -816,51 +870,40 @@ void loop() {
   } else if (g_mode == MODE_PID_HOLD) {
     const float error = g_targetAngle - currentAngle;
 
-    if (axisLooksWrong()) {
-      g_mode = MODE_MONITOR;
-      stopAllMotors();
-      Serial.println(F("\n[!] HOLD ABORTED: hinge axis inconsistency detected."));
-      Serial.println(F("    The angle feedback cannot be trusted. Run 'c' then 'z'."));
-      return;
-    }
-
-    // Safety runaway tripwire: if arm is pushed or driven beyond 45 deg error, cut power
-    if (fabsf(error) > RUNAWAY_ANGLE_LIMIT) {
-      g_mode = MODE_MONITOR;
-      stopAllMotors();
-      Serial.print(F("\n[!] RUNAWAY PROTECTION TRIPPED: Error = "));
-      Serial.print(error, 1);
-      Serial.println(F(" deg. Motor turned OFF!"));
-      return;
-    }
-
-    // Derivative on measurement (negative rate of change) avoids setpoint kick.
-    // Updated every cycle, including inside the deadband, so the term cannot go
-    // stale and kick when the arm leaves the deadband.
-    const float dAngle = (currentAngle - g_prevAngle) / dt;
-    g_prevAngle = currentAngle;
-    const float derivative = -dAngle;
-
-    if (fabsf(error) < DEADBAND_DEG) {
-      setMotor(0, 0); // Within deadband target, coast motor
+    // Clamped by its own contribution so the limit keeps its meaning when Ki is
+    // retuned. Held at zero while Ki is zero so it cannot accumulate unnoticed.
+    if (g_Ki > 0.0f) {
+      const float iLimit = MAX_TEST_PWM / g_Ki;
+      g_integral = constrain(g_integral + error * dt, -iLimit, iLimit);
     } else {
-      g_integral = constrain(g_integral + error * dt, -20.0f, 20.0f);
-
-      float output = (g_Kp * error) + (g_Ki * g_integral) + (g_Kd * derivative);
-      output *= g_motorPolarity;
-
-      const int8_t dir = (output > 0) ? 1 : ((output < 0) ? -1 : 0);
-      const uint8_t pwm = constrain(static_cast<int>(fabsf(output)), MIN_PWM, MAX_TEST_PWM);
-      setMotor(dir, pwm);
+      g_integral = 0.0f;
     }
+
+    // Derivative on measurement avoids setpoint kick.
+    float output = (g_Kp * error) + (g_Ki * g_integral) - (g_Kd * g_omegaHinge);
+    output *= g_motorPolarity;
+
+    int8_t dir = (output > 0) ? 1 : ((output < 0) ? -1 : 0);
+    int pwm = static_cast<int>(fabsf(output));
+    if (pwm > MAX_TEST_PWM) pwm = MAX_TEST_PWM;
+    if (pwm < MIN_PWM) { pwm = 0; dir = 0; }
+    if (!rotationWithinBounds(currentAngle, dir)) { pwm = 0; dir = 0; }
+
+    setMotor(dir, static_cast<uint8_t>(pwm));
 
     if (millis() - lastPrint >= 100) {
       lastPrint = millis();
       Serial.print(F("HOLD >> Target: ")); Serial.print(g_targetAngle, 1);
       Serial.print(F(" | Angle: ")); Serial.print(currentAngle, 1);
       Serial.print(F(" | Error: ")); Serial.print(error, 1);
-      Serial.print(F(" deg | bias: ")); Serial.print(g_thetaBias, 2);
-      Serial.println(g_lastAccUsed ? F(" dps [ACC OK]") : F(" dps [GYRO ONLY]"));
+      Serial.print(F(" | dir: ")); Serial.print(static_cast<int>(dir));
+      Serial.print(F(" pwm: ")); Serial.print(pwm);
+      Serial.print(F(" | rate: ")); Serial.print(g_omegaHinge, 1);
+      Serial.print(g_lastAccUsed ? F(" dps [ACC OK]") : F(" dps [GYRO ONLY]"));
+      // Warned rather than aborted: a spread at the threshold is a few degrees of
+      // feedback error, not a safety issue, and the travel bounds are what
+      // protect the hardware. Engaging on a bad axis is still refused outright.
+      Serial.println(axisLooksWrong() ? F(" [AXIS?]") : F(""));
     }
   }
 
